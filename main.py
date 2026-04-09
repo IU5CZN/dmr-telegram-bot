@@ -30,24 +30,19 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         url = f"https://api.brandmeister.network/v1.0/repeater/?action=profile&q={HOTSPOT_ID}"
         r = requests.get(url, timeout=10)
 
-        # DEBUG SICURO
+        print("BM RAW RESPONSE:", r.text)  # DEBUG corretto
+
         try:
             data = r.json()
         except:
-            await update.message.reply_text("⚠️ API non restituisce JSON valido")
+            await update.message.reply_text("⚠️ Risposta non JSON da BrandMeister")
             return
 
-        # se risposta vuota
         if not data:
-            await update.message.reply_text("⚠️ Nessun dato per questo hotspot")
+            await update.message.reply_text("⚠️ Nessun dato disponibile")
             return
 
-        # stato con fallback multiplo
-        status_val = data.get("status")
-
-        if status_val is None:
-            # alcuni BM restituiscono campi diversi
-            status_val = data.get("state", "unknown")
+        status_val = data.get("status", "unknown")
 
         if str(status_val) == "1":
             stato = "🟢 Online"
@@ -56,13 +51,11 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             stato = f"🟡 Sconosciuto ({status_val})"
 
-        await update.message.reply_text(
-            f"📡 IU5CZN\n{stato}"
-        )
+        await update.message.reply_text(f"📡 IU5CZN → {stato}")
 
     except Exception as e:
-        await update.message.reply_text(f"❌ Errore: {str(e)}")
-
+        await update.message.reply_text(f"❌ Errore: {e}")
+        
 print("BM RAW RESPONSE:", r.text)
 
 async def last(update: Update, context: ContextTypes.DEFAULT_TYPE):

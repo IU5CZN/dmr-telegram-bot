@@ -1,80 +1,86 @@
 import os
-import requests
+import threading
+import paho.mqtt.client as mqtt
+
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+
+# ======================
+# CONFIG
+# ======================
 
 TOKEN = os.getenv("TOKEN")
 
 HOTSPOT_ID = "223173301"
 CALLSIGN = "IU5CZN"
 
+last_message = None
 
-def get_status():
-    url = f"https://api.brandmeister.network/v2/device/{HOTSPOT_ID}"
-    r = requests.get(url, timeout=10)
-    return r.json() if r.status_code == 200 else None
+# ======================
+# MQTT SETUP (BrandMeister)
+# ======================
 
-
-def get_lastheard():
-    url = f"https://api.brandmeister.network/v2/repeater/{HOTSPOT_ID}/last-heard"
-    r = requests.get(url, timeout=10)
-    return r.json() if r.status_code == 200 else None
+MQTT_BROKER = "broker.brandmeister.network"
+MQTT_PORT = 1883
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("📡 Bot IU5CZN attivo")
+def on_connect(client, userdata, flags, rc):
+    print("MQTT connesso:", rc)
+
+    # ascolti generici DMR
+    client.subscribe("dmr/#")
 
 
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def on_message(client, userdata, msg):
+    global last_message
+
     try:
-        url = f"https://api.brandmeister.network/v1.0/repeater/?action=profile&q={HOTSPOT_ID}"
-        r = requests.get(url, timeout=10)
+        payload = msg.payload.decode(errors="ignore")
 
-        print("BM RAW RESPONSE:", r.text)  # DEBUG corretto
-
-        try:
-            data = r.json()
-        except:
-            await update.message.reply_text("⚠️ Risposta non JSON da BrandMeister")
-            return
-
-        if not data:
-            await update.message.reply_text("⚠️ Nessun dato disponibile")
-            return
-
-        status_val = data.get("status", "unknown")
-
-        if str(status_val) == "1":
-            stato = "🟢 Online"
-        elif str(status_val) == "0":
-            stato = "🔴 Offline"
-        else:
-            stato = f"🟡 Sconosciuto ({status_val})"
-
-        await update.message.reply_text(f"📡 IU5CZN → {stato}")
+        # filtro base (puoi migliorarlo dopo)
+        if any(x in payload.lower() for x in ["tg", "talkgroup", "callsign"]):
+            last_message = payload
 
     except Exception as e:
-        await update.message.reply_text(f"❌ Errore: {e}")
-        
-print("BM RAW RESPONSE:", r.text)
+        print("MQTT error:", e)
 
-async def last(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        data = get_lastheard()
-        msg = "📻 Ultimi QSO:\n"
-        for qso in data[:5]:
-            msg += f"{qso['callsign']} → TG{qso['talkgroup']}\n"
-        await update.message.reply_text(msg)
-    except:
-        await update.message.reply_text("Errore lastheard")
 
+mqtt_client = mqtt.Client()
+mqtt_client.on_connect = on_connect
+mqtt_client.on_message = on_message
+
+
+def start_mqtt():
+    mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    mqtt_client.loop_forever()
+
+
+threading.Thread(target=start_mqtt, daemon=True).start()
+
+# ======================
+# TELEGRAM BOT
+# ======================
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("📡 Bot IU5CZN attivo (MQTT live)")
+
+
+async def tg(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if last_message:
+        await update.message.reply_text(f"📡 LIVE DMR:\n{last_message}")
+    else:
+        await update.message.reply_text("Nessun traffico ancora")
+
+
+# ======================
+# START APP
+# ======================
 
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("status", status))
-app.add_handler(CommandHandler("last", last))
+app.add_handler(CommandHandler("tg", tg))
 
-print("BOT DMR AVVIATO")
+print("BOT AVVIATO")
 
 app.run_polling()

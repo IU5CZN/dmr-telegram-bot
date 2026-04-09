@@ -102,3 +102,9 @@ app.add_handler(CommandHandler("tg", tg))
 
 
 app.run_polling()
+async def main():
+    asyncio.create_task(monitor(app))
+    await app.run_polling()
+
+if __name__ == "__main__":
+    asyncio.run(main())

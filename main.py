@@ -99,6 +99,6 @@ app.add_handler(CommandHandler("status", status))
 app.add_handler(CommandHandler("last", last))
 app.add_handler(CommandHandler("tg", tg))
 
-app.job_queue.run_once(lambda *_: asyncio.create_task(monitor(app)), 1)
+
 
 app.run_polling()

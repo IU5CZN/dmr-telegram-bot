@@ -25,20 +25,45 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📡 Bot IU5CZN attivo")
 
 
-state = data.get("status", "unknown")
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        url = f"https://api.brandmeister.network/v1.0/repeater/?action=profile&q={HOTSPOT_ID}"
+        r = requests.get(url, timeout=10)
 
-if str(state) == "1":
-     stato = "🟢 Online"
-elif str(state) == "0":
-     stato = "🔴 Offline"
-else:
-     stato = "🟡 Sconosciuto"
+        # DEBUG SICURO
+        try:
+            data = r.json()
+        except:
+            await update.message.reply_text("⚠️ API non restituisce JSON valido")
+            return
 
-await update.message.reply_text(f"{CALLSIGN} → {stato}")
+        # se risposta vuota
+        if not data:
+            await update.message.reply_text("⚠️ Nessun dato per questo hotspot")
+            return
 
-except Exception as e:
-await update.message.reply_text(f"Errore: {e}")
+        # stato con fallback multiplo
+        status_val = data.get("status")
 
+        if status_val is None:
+            # alcuni BM restituiscono campi diversi
+            status_val = data.get("state", "unknown")
+
+        if str(status_val) == "1":
+            stato = "🟢 Online"
+        elif str(status_val) == "0":
+            stato = "🔴 Offline"
+        else:
+            stato = f"🟡 Sconosciuto ({status_val})"
+
+        await update.message.reply_text(
+            f"📡 IU5CZN\n{stato}"
+        )
+
+    except Exception as e:
+        await update.message.reply_text(f"❌ Errore: {str(e)}")
+
+print("BM RAW RESPONSE:", r.text)
 
 async def last(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:

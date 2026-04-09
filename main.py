@@ -14,7 +14,8 @@ TOKEN = os.getenv("TOKEN")
 HOTSPOT_ID = "223173301"
 CALLSIGN = "IU5CZN"
 
-last_message = None
+last_qso = None
+last_tg = None
 
 # ======================
 # MQTT SETUP (BrandMeister)
@@ -32,14 +33,22 @@ def on_connect(client, userdata, flags, rc):
 
 
 def on_message(client, userdata, msg):
-    global last_message
+    global last_qso, last_tg
 
     try:
         payload = msg.payload.decode(errors="ignore")
 
-        # filtro base (puoi migliorarlo dopo)
-        if any(x in payload.lower() for x in ["tg", "talkgroup", "callsign"]):
-            last_message = payload
+        # filtra solo traffico utile DMR
+        if "talkgroup" in payload.lower() or "tg" in payload.lower():
+
+            last_qso = payload
+
+            # prova estrazione TG semplice
+            import re
+            tg = re.findall(r"\b\d{2,8}\b", payload)
+
+            if tg:
+                last_tg = tg[0]
 
     except Exception as e:
         print("MQTT error:", e)
@@ -66,10 +75,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def tg(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if last_message:
-        await update.message.reply_text(f"📡 LIVE DMR:\n{last_message}")
+
+    if last_qso:
+        msg = f"📡 LIVE DMR IU5CZN\n"
+
+        if last_tg:
+            msg += f"TG Attivo: {last_tg}\n\n"
+
+        msg += f"Dati:\n{last_qso}"
+
+        await update.message.reply_text(msg)
+
     else:
-        await update.message.reply_text("Nessun traffico ancora")
+        await update.message.reply_text("Nessun traffico rilevato ancora")
 
 
 # ======================

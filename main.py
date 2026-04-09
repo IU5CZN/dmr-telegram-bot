@@ -10,26 +10,34 @@ CALLSIGN = "IU5CZN"
 
 
 def get_status():
-    url = f"https://api.brandmeister.network/v1.0/repeater/?action=profile&q={HOTSPOT_ID}"
-    return requests.get(url, timeout=10).json()
+    url = f"https://api.brandmeister.network/v2/device/{HOTSPOT_ID}"
+    r = requests.get(url, timeout=10)
+    return r.json() if r.status_code == 200 else None
 
 
 def get_lastheard():
-    url = f"https://api.brandmeister.network/v1.0/repeater/?action=lastheard&q={HOTSPOT_ID}"
-    return requests.get(url, timeout=10).json()
+    url = f"https://api.brandmeister.network/v2/repeater/{HOTSPOT_ID}/last-heard"
+    r = requests.get(url, timeout=10)
+    return r.json() if r.status_code == 200 else None
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📡 Bot IU5CZN attivo")
 
 
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        data = get_status()
-        stato = "🟢 Online" if data.get("status") == 1 else "🔴 Offline"
-        await update.message.reply_text(f"{CALLSIGN} → {stato}")
-    except:
-        await update.message.reply_text("Errore status")
+state = data.get("status", "unknown")
+
+if str(state) == "1":
+     stato = "🟢 Online"
+elif str(state) == "0":
+     stato = "🔴 Offline"
+else:
+     stato = "🟡 Sconosciuto"
+
+await update.message.reply_text(f"{CALLSIGN} → {stato}")
+
+except Exception as e:
+await update.message.reply_text(f"Errore: {e}")
 
 
 async def last(update: Update, context: ContextTypes.DEFAULT_TYPE):
